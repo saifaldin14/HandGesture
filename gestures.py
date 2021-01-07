@@ -107,4 +107,61 @@ def detect_num_fingers(contour: np.ndarray, defects: np.ndarray,
                       fingers and an annotated RGB color image
     """
 
+    # if there are no convexity defects, possibly no hull or no fingers detected
+    if defects is None:
+        return [0, img_draw]
+
+    # assume the wrist will generate two convexity defects
+    # (one on each side), so if there are no additional defect points,
+    # there are no fingers extended
+    if len(defects) <= 2:
+        return [0, img_draw]
+
+    # if there is a suffiecinet amount of convexity defects,
+    # we will find a defect point between two fingers so to get
+    # the number of fingers, starting at 1
+    num_fingers = 1
+
+    # Defects are of shape (num_defects, 1, 4)
+    for defect in defects[:, 0, :]:
+        # Each defect is an array of four integers.
+        # First three indexes of start, end and the furthest
+        # points respectively
+        # contour is of shape (num_points,1,2) - 2 for point coordinates
+        start, end, far = [contour[i][0] for i in defect[:3]]
+
+        # draw the hull
+        cv2.line(img_draw, tuple(start), tuple(end), (0, 255, 0), 2)
+
+        # if angle is below a threshold, defect point belongs to two
+        # extended fingers
+        if angle_rad(start - far, end - far) < deg2rand(thresh_deg):
+            # increment number of fingers
+            num_fingers += 1
+
+            #draw the point as green
+            cv2.circle(img_draw, tuple(far), 5, (0, 255, 0), -1)
+        else:
+            # draw point as red
+            cv2.circle(img_draw, tuple(far), 5, (0, 0, 255), -1)
+
+    # make sure we set the maximum number of fingers to be 5
+    return min(5, num_fingers), img_draw
+
+def angle_rad(v1, v2):
+    """
+    Angle in radians between two vectors
+            This method returns the angle (in radians) between two array-like
+            vectors using the cross-product method, which is more accurate for
+            small angles than the dot-product-acos method.
+    """
+    return np.arctan2(np.linalg.norm(np.cross(v1, v2)), np.dot(v1, v2))
+
+def deg2rad (angle_deg):
+    """
+    Convert degrees to radians
+            This method converts an angle in radians e[0,2*np.pi) into degrees
+            e[0,360)
+    """
+    return angle_deg / 180.0 * np.pi
 
